@@ -10,125 +10,202 @@ import yaml
 
 from dataclasses import dataclass, field
 
-class Snippet(str): 
-    @staticmethod
-    def representer(dumper, data):
-      if len(data.splitlines()) > 1:  # check for multiline string
-        return dumper.represent_scalar('tag:yaml.org,2002:str', data, style='|')
-      return dumper.represent_scalar('tag:yaml.org,2002:str', data)
+
+class Snippet(str):
+
+  @staticmethod
+  def representer(dumper, data):
+    if len(data.splitlines()) > 1:  # check for multiline string
+      return dumper.represent_scalar('tag:yaml.org,2002:str', data, style='|')
+    return dumper.represent_scalar('tag:yaml.org,2002:str', data)
+
 
 yaml.add_representer(Snippet, Snippet.representer)
 
-class YAMLRenderable: pass
+
+class YAMLRenderable:
+  pass
+
 
 class On(YAMLRenderable):
-    def __init__(self, push=None, pull_request=None, schedule=None):
-        self.fields = {
-            "push": push,
-            "pull_request": pull_request,
-            "schedule": schedule
-        }
+
+  def __init__(self, push=None, pull_request=None, schedule=None):
+    self.fields = {
+        "push": push,
+        "pull_request": pull_request,
+        "schedule": schedule
+    }
+
 
 class Workflow(YAMLRenderable):
-    def __init__(self, name, on, env=None, jobs=None):
-        self.fields = {
-            "name": name,
-            "on": on,
-            "env": env,
-            "jobs": jobs
-        }
+
+  def __init__(self, name, on, env=None, jobs=None):
+    self.fields = {"name": name, "on": on, "env": env, "jobs": jobs}
+
 
 class Job(YAMLRenderable):
-    def __init__(self, name, runs_on, outputs=None, condition=None, steps=None, needs=None):
-        self.fields = {
-            "name": name,
-            "needs": needs,
-            "runs-on": runs_on,
-            "outputs": outputs,
-            "if": condition,
-            "steps": steps
-        }
+
+  def __init__(self,
+               name,
+               runs_on,
+               outputs=None,
+               condition=None,
+               steps=None,
+               needs=None):
+    self.fields = {
+        "name": name,
+        "needs": needs,
+        "runs-on": runs_on,
+        "outputs": outputs,
+        "if": condition,
+        "steps": steps
+    }
+
 
 class Checkout(YAMLRenderable):
-    def __init__(self):
-        self.fields = {
-            "name": "Checkout",
-            "uses": "actions/checkout@v2",
-            "with": {
-                "submodules": "recursive"
-            }
+
+  def __init__(self):
+    self.fields = {
+        "name": "Checkout",
+        "uses": "actions/checkout@v2",
+        "with": {
+            "submodules": "recursive"
         }
+    }
 
 
-class JobStep(YAMLRenderable):
-    def __init__(self, name, working_directory, run):
-        self.fields = {
-            "name": name,
-            "working-directory": working_directory,
-            "run": Snippet(run) if '\n' in run else run,
-        }
+class JobShellStep(YAMLRenderable):
+
+  def __init__(self, name, working_directory, run, shell=None):
+    self.fields = {
+        "name": name,
+        "working-directory": working_directory,
+        "shell": shell,
+        "run": Snippet(run) if '\n' in run else run,
+    }
+
 
 class BRT(list):
-    def __init__(self, working_directory='bergamot-translator-tests'):
-        super().__init__([
-            JobStep(
-                name="Install regression-test framework (BRT)",
-                working_directory=working_directory,
-                run="make install"
-            ),
-            JobStep(
-                name="Run regression-tests (BRT)",
-                working_directory=working_directory,
-                run="MARIAN=../build ./run_brt.sh ${{ matrix.test_tags }}"
-            )
-        ])
 
-class ImportedSnippet(JobStep):
-    def __init__(self, name, fpath, working_directory=None):
-        contents = None
-        with open(fpath) as fp:
-            contents = fp.read().strip()
-        super().__init__(name, working_directory, contents)
+  def __init__(self, working_directory='bergamot-translator-tests'):
+    super().__init__([
+        JobShellStep(
+            name="Install regression-test framework (BRT)",
+            working_directory=working_directory,
+            run="make install"),
+        JobShellStep(
+            name="Run regression-tests (BRT)",
+            working_directory=working_directory,
+            run="MARIAN=../build ./run_brt.sh ${{ matrix.test_tags }}")
+    ])
+
+
+class ImportedSnippet(JobShellStep):
+
+  def __init__(self, name, fpath, working_directory=None):
+    contents = None
+    with open(fpath) as fp:
+      contents = fp.read().strip()
+    super().__init__(name, working_directory, contents)
+
 
 def resolve(cls):
-    native = None
-    if isinstance(cls, YAMLRenderable):
-        native = resolve(cls.fields)
+  native = None
+  if isinstance(cls, YAMLRenderable):
+    native = resolve(cls.fields)
 
-    elif isinstance(cls, list):
-        native = [ resolve(v) for v in cls if v is not None]
+  elif isinstance(cls, list):
+    native = [resolve(v) for v in cls if v is not None]
 
-    elif isinstance(cls, dict):
-        native = { k: resolve(v)  for k, v in cls.items() if v is not None}
+  elif isinstance(cls, dict):
+    native = {k: resolve(v) for k, v in cls.items() if v is not None}
 
-    else:
-        native = cls
+  else:
+    native = cls
 
-    return native
+  return native
 
+
+class CcacheEnv(YAMLRenderable):
+
+  def __init__(self,
+               check=None,
+               base_dir=None,
+               directory=None,
+               compress=None,
+               maxsize=None):
+    env = {
+        'COMPILER_CHECK': check,
+        'BASE_DIR': base_dir,
+        'COMPRESS': compress,
+        'DIR': directory,
+        'MAXSIZE': maxsize
+    }
+
+    commands = [
+        'echo "CCACHE_{key}={value}" >> $GITHUB_ENV'.format(
+            key=key, value=value) for key, value in env.items()
+    ]
+
+    self.fields = {
+        "name": "ccache environment setup",
+        "run": Snippet('\n'.join(commands))
+    }
+
+
+class CcacheVars(YAMLRenderable):
+
+  def __init__(self, check):
+    ccache_vars = {"hash": check, "timestamp": "date '+%Y-%m-%dT%H.%M.%S'"}
+
+    commands = [
+        'echo "::set-output name={key}::$({evalExpr})'.format(
+            key=key, evalExpr=evalExpr)
+        for key, evalExpr in ccache_vars.items()
+    ]
+
+    self.fields = {
+        "name": "Generate cache vars for ccache based on machine",
+        "id": "ccache_vars",
+        "shell": "bash",
+        "run": Snippet('\n'.join(commands))
+    }
 
 
 if __name__ == '__main__':
-    on = On(push={"branches": ['main']}, pull_request={ "branches": ['main']})
-    env = dict([
-            ('this_repository', 'browsermt/bergamot-translator')
-    ])
+  on = On(push={"branches": ['main']}, pull_request={"branches": ['main']})
+  env = {'this_repository': 'browsermt/bergamot-translator'}
 
-    job1 = Job(name='job1',
-            runs_on='ubuntu-16.04',
-            steps=[
-                Checkout(),
-                ImportedSnippet("Install Dependencies", "examples/bergamot-translator/native-ubuntu/00-install-deps.sh"),
-                ImportedSnippet("Install MKL", "examples/bergamot-translator/native-ubuntu/01-install-mkl.sh"),
-                ImportedSnippet("cmake", "examples/bergamot-translator/native-ubuntu/10-cmake-run.sh"),
-                ImportedSnippet("Build from source", "examples/bergamot-translator/native-ubuntu/20-build.sh"),
-                ImportedSnippet("Print Versions", "examples/bergamot-translator/native-ubuntu/21-print-versions.sh", working_directory='build'),
-                ImportedSnippet("Run unit tests", "examples/bergamot-translator/native-ubuntu/30-unit-tests.sh", working_directory='build'),
-                *BRT(),
-            ]
-            
-    )
+  job1 = Job(
+      name='job1',
+      runs_on='ubuntu-16.04',
+      steps=[
+          Checkout(),
+          ImportedSnippet(
+              "Install Dependencies",
+              "examples/bergamot-translator/native-ubuntu/00-install-deps.sh"),
+          ImportedSnippet(
+              "Install MKL",
+              "examples/bergamot-translator/native-ubuntu/01-install-mkl.sh"),
+          CcacheVars(check='${{matrix.cmd}}'),
+          CcacheEnv(),
+          ImportedSnippet(
+              "cmake",
+              "examples/bergamot-translator/native-ubuntu/10-cmake-run.sh"),
+          ImportedSnippet(
+              "Build from source",
+              "examples/bergamot-translator/native-ubuntu/20-build.sh"),
+          ImportedSnippet(
+              "Print Versions",
+              "examples/bergamot-translator/native-ubuntu/21-print-versions.sh",
+              working_directory='build'),
+          ImportedSnippet(
+              "Run unit tests",
+              "examples/bergamot-translator/native-ubuntu/30-unit-tests.sh",
+              working_directory='build'),
+          *BRT(),
+      ])
 
-    jobs = {"job1": job1}
-    workflow = Workflow(name='default', on=on, env=env, jobs=jobs)
-    print(yaml.dump(resolve(workflow), sort_keys=False))
+  jobs = {"job1": job1}
+  workflow = Workflow(name='default', on=on, env=env, jobs=jobs)
+  print(yaml.dump(resolve(workflow), sort_keys=False))
