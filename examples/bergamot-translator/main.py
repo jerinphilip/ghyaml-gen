@@ -62,31 +62,34 @@ if __name__ == '__main__':
       ys.extend(x)
     return ys
 
-  env = {
-      "gcc":
-          8,
-      "CCACHE_DIR":
-          QuotedExpr(os.path.join(GitHubExpr('github.workspace'), '.ccache')),
-      "cache_cmd":
-          QuotedExpr(
-              'bash ${GITHUB_WORKSPACE}/scripts/ci/compiler-hash.sh %compiler%'
-          ),
-      "cmake":
-          QuotedExpr(
-              '-DCMAKE_BUILD_TYPE=Release -DCOMPILE_TESTS=on -DCOMPILE_SERVER=off'
-          ),
-      # "brt_tags": QuotedExpr("'#native'"),
-      "brt_tags":
-          None,
-  }
+  def build_env(with_cache=False):
+      maybeCcache = '-DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_C_COMPILER_LAUNCHER=ccache' if with_cache else ''
+      env = {
+          "gcc":
+              8,
+          "CCACHE_DIR":
+              QuotedExpr(os.path.join(GitHubExpr('github.workspace'), '.ccache')),
+          "cache_cmd":
+              QuotedExpr(
+                  'bash ${GITHUB_WORKSPACE}/scripts/ci/compiler-hash.sh %compiler%'
+              ),
+          "cmake":
+              QuotedExpr(
+                  '-DCMAKE_BUILD_TYPE=Release -DCOMPILE_TESTS=on {maybeCcache}'.format(maybeCcache=maybeCcache)
+              ),
+          # "brt_tags": QuotedExpr("'#native'"),
+          "brt_tags":
+              None,
+      }
+      return env
 
   cached = Job(name='cached',
-               env=env,
+               env=build_env(with_cache=True),
                runs_on='ubuntu-18.04',
                steps=merge(setup, ccache(build), build_epilog, BRT()))
 
   fresh = Job(name='fresh',
-              env=env,
+              env=build_env(with_cache=False),
               needs=Needs(job=cached, result='failure'),
               runs_on='ubuntu-18.04',
               steps=merge(setup, build, build_epilog, BRT()))
