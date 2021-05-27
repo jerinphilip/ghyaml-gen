@@ -76,11 +76,12 @@ class Checkout(YAMLRenderable):
 
 class JobShellStep(YAMLRenderable):
 
-  def __init__(self, name, working_directory, run, shell=None):
+  def __init__(self, name, run, working_directory=None, shell=None, id=None):
     self.fields = {
         "name": name,
         "working-directory": working_directory,
         "shell": shell,
+        "id": id,
         "run": Snippet(run) if '\n' in run else run,
     }
 
@@ -106,7 +107,7 @@ class ImportedSnippet(JobShellStep):
     contents = None
     with open(fpath) as fp:
       contents = fp.read().strip()
-    super().__init__(name, working_directory, contents)
+    super().__init__(name=name, run=contents, working_directory=working_directory)
 
 
 def resolve(cls):
@@ -126,7 +127,7 @@ def resolve(cls):
   return native
 
 
-class CcacheEnv(YAMLRenderable):
+class CcacheEnv(JobShellStep):
 
   def __init__(self,
                check=None,
@@ -147,13 +148,11 @@ class CcacheEnv(YAMLRenderable):
             key=key, value=value) for key, value in env.items()
     ]
 
-    self.fields = {
-        "name": "ccache environment setup",
-        "run": Snippet('\n'.join(commands))
-    }
+    run = '\n'.join(commands)
+    super().__init__(name="ccache environment setup", run=run)
 
 
-class CcacheVars(YAMLRenderable):
+class CcacheVars(JobShellStep):
 
   def __init__(self, check):
     ccache_vars = {"hash": check, "timestamp": "date '+%Y-%m-%dT%H.%M.%S'"}
@@ -164,12 +163,27 @@ class CcacheVars(YAMLRenderable):
         for key, evalExpr in ccache_vars.items()
     ]
 
-    self.fields = {
-        "name": "Generate cache vars for ccache based on machine",
-        "id": "ccache_vars",
-        "shell": "bash",
-        "run": Snippet('\n'.join(commands))
-    }
+    super().__init__(
+        name="Generate ccache_vars for ccache based on machine",
+        run='\n'.join(commands),
+        id="ccache_vars",
+        shell="bash"
+    )
+
+class CCacheProlog(JobShellStep):
+    def __init__(self):
+        commands = [
+            'ccache -s # Print current cache stats',
+            'ccache -z # Zero cache entry',
+        ]
+        super().__init__(name="ccache prolog", run = '\n'.join(commands))
+
+class CCacheEpilog(JobShellStep):
+    def __init__(self):
+        commands = [
+            'ccache -s # Print current cache stats',
+        ]
+        super().__init__(name="ccache epilog", run = '\n'.join(commands))
 
 
 if __name__ == '__main__':
@@ -189,12 +203,14 @@ if __name__ == '__main__':
               "examples/bergamot-translator/native-ubuntu/01-install-mkl.sh"),
           CcacheVars(check='${{matrix.cmd}}'),
           CcacheEnv(),
+          CCacheProlog(),
           ImportedSnippet(
               "cmake",
               "examples/bergamot-translator/native-ubuntu/10-cmake-run.sh"),
           ImportedSnippet(
               "Build from source",
               "examples/bergamot-translator/native-ubuntu/20-build.sh"),
+          CCacheEpilog(),
           ImportedSnippet(
               "Print Versions",
               "examples/bergamot-translator/native-ubuntu/21-print-versions.sh",
