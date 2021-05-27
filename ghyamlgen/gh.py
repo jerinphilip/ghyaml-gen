@@ -89,7 +89,7 @@ class GHCache(YAMLRenderable):
         "uses": "actions/cache@v2",
         "with": {
             "path": '${{ env.CCACHE_DIR }}',
-            "key": "ccache-${{ job.name }}-${{ steps.ccache_vars.outputs.hash }}-${{ github.ref }}-${{ steps.ccache_vars.outputs.timestamp }}",
+            "key": "ccache-${{ github.job }}-${{ steps.ccache_vars.outputs.hash }}-${{ github.ref }}-${{ steps.ccache_vars.outputs.timestamp }}",
             "restore-keys":
                 Snippet('\n'.join([
                     "ccache-${{ github.job }}-${{ steps.ccache_vars.outputs.hash }}-${{ github.ref }}-",
