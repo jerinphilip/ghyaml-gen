@@ -59,16 +59,36 @@ class Checkout(YAMLRenderable):
             }
         }
 
-class ImportedSnippet(YAMLRenderable):
-    def __init__(self, name, fpath):
-        contents = None
-        with open(fpath) as fp:
-            contents = fp.read()
 
+class JobStep(YAMLRenderable):
+    def __init__(self, name, working_directory, run):
         self.fields = {
             "name": name,
-            "run": Snippet(contents)
+            "working-directory": working_directory,
+            "run": Snippet(run) if '\n' in run else run,
         }
+
+class BRT(list):
+    def __init__(self, working_directory='bergamot-translator-tests'):
+        super().__init__([
+            JobStep(
+                name="Install regression-test framework (BRT)",
+                working_directory=working_directory,
+                run="make install"
+            ),
+            JobStep(
+                name="Run regression-tests (BRT)",
+                working_directory=working_directory,
+                run="MARIAN=../build ./run_brt.sh ${{ matrix.test_tags }}"
+            )
+        ])
+
+class ImportedSnippet(JobStep):
+    def __init__(self, name, fpath, working_directory=None):
+        contents = None
+        with open(fpath) as fp:
+            contents = fp.read().strip()
+        super().__init__(name, working_directory, contents)
 
 def resolve(cls):
     native = None
@@ -98,7 +118,13 @@ if __name__ == '__main__':
             runs_on='ubuntu-16.04',
             steps=[
                 Checkout(),
-                ImportedSnippet("Install Dependencies", "examples/bergamot-translator/native-ubuntu/00-install-deps.sh")
+                ImportedSnippet("Install Dependencies", "examples/bergamot-translator/native-ubuntu/00-install-deps.sh"),
+                ImportedSnippet("Install MKL", "examples/bergamot-translator/native-ubuntu/01-install-mkl.sh"),
+                ImportedSnippet("cmake", "examples/bergamot-translator/native-ubuntu/10-cmake-run.sh"),
+                ImportedSnippet("Build from source", "examples/bergamot-translator/native-ubuntu/20-build.sh"),
+                ImportedSnippet("Print Versions", "examples/bergamot-translator/native-ubuntu/21-print-versions.sh", working_directory='build'),
+                ImportedSnippet("Run unit tests", "examples/bergamot-translator/native-ubuntu/30-unit-tests.sh", working_directory='build'),
+                *BRT(),
             ]
             
     )
