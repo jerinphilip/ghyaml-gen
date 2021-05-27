@@ -7,28 +7,32 @@ from collections import OrderedDict
 import typing as t
 import sys
 import yaml
-
 from dataclasses import dataclass, field
 
-
 class Snippet(str):
-
   @staticmethod
   def representer(dumper, data):
     if len(data.splitlines()) > 1:  # check for multiline string
       return dumper.represent_scalar('tag:yaml.org,2002:str', data, style='|')
     return dumper.represent_scalar('tag:yaml.org,2002:str', data)
 
-
 yaml.add_representer(Snippet, Snippet.representer)
 
+class GitHubExpr(str):
+  def __new__(cls, value):
+      value = '${{ ' + value + ' }}'
+      return str.__new__(cls, value)
+
+  @staticmethod
+  def representer(dumper, data):
+    return dumper.represent_scalar('tag:yaml.org,2002:str', data)
+
+yaml.add_representer(GitHubExpr, GitHubExpr.representer)
 
 class YAMLRenderable:
-  pass
-
+    pass
 
 class On(YAMLRenderable):
-
   def __init__(self, push=None, pull_request=None, schedule=None):
     self.fields = {
         "push": push,
@@ -36,15 +40,23 @@ class On(YAMLRenderable):
         "schedule": schedule
     }
 
-
 class Workflow(YAMLRenderable):
 
   def __init__(self, name, on, env=None, jobs=None):
     self.fields = {"name": name, "on": on, "env": env, "jobs": jobs}
 
 
-class Job(YAMLRenderable):
+class Needs(YAMLRenderable):
+    def __init__(self, job, result=None):
+        suffix = '' if result is None else '== {}'.format(result)
+        condition = "needs.{jobname}.result {suffix}".format(jobname = job.fields["name"], suffix = suffix)
+        self.fields = {
+            "needs": job.fields["needs"],
+            "if": GitHubExpr(condition)
+        }
 
+
+class Job(YAMLRenderable):
   def __init__(self,
                name,
                runs_on,
@@ -52,14 +64,23 @@ class Job(YAMLRenderable):
                condition=None,
                steps=None,
                needs=None):
+
+    condition = None if needs is None else needs.fields["if"]
+    needed_job = None if needs is None else needs.fields["needs"]
+
     self.fields = {
         "name": name,
         "needs": needs,
         "runs-on": runs_on,
         "outputs": outputs,
         "if": condition,
-        "steps": steps
+        "steps": steps,
+        "needs": needed_job,
     }
+
+class Group(YAMLRenderable):
+    def __init__(self, *renderables):
+        self.renderables = renderables
 
 
 class Checkout(YAMLRenderable):
@@ -156,7 +177,6 @@ class CcacheVars(JobShellStep):
 
   def __init__(self, check):
     ccache_vars = {"hash": check, "timestamp": "date '+%Y-%m-%dT%H.%M.%S'"}
-
     commands = [
         'echo "::set-output name={key}::$({evalExpr})'.format(
             key=key, evalExpr=evalExpr)
@@ -185,43 +205,3 @@ class CCacheEpilog(JobShellStep):
         ]
         super().__init__(name="ccache epilog", run = '\n'.join(commands))
 
-
-if __name__ == '__main__':
-  on = On(push={"branches": ['main']}, pull_request={"branches": ['main']})
-  env = {'this_repository': 'browsermt/bergamot-translator'}
-
-  job1 = Job(
-      name='job1',
-      runs_on='ubuntu-16.04',
-      steps=[
-          Checkout(),
-          ImportedSnippet(
-              "Install Dependencies",
-              "examples/bergamot-translator/native-ubuntu/00-install-deps.sh"),
-          ImportedSnippet(
-              "Install MKL",
-              "examples/bergamot-translator/native-ubuntu/01-install-mkl.sh"),
-          CcacheVars(check='${{matrix.cmd}}'),
-          CcacheEnv(),
-          CCacheProlog(),
-          ImportedSnippet(
-              "cmake",
-              "examples/bergamot-translator/native-ubuntu/10-cmake-run.sh"),
-          ImportedSnippet(
-              "Build from source",
-              "examples/bergamot-translator/native-ubuntu/20-build.sh"),
-          CCacheEpilog(),
-          ImportedSnippet(
-              "Print Versions",
-              "examples/bergamot-translator/native-ubuntu/21-print-versions.sh",
-              working_directory='build'),
-          ImportedSnippet(
-              "Run unit tests",
-              "examples/bergamot-translator/native-ubuntu/30-unit-tests.sh",
-              working_directory='build'),
-          *BRT(),
-      ])
-
-  jobs = {"job1": job1}
-  workflow = Workflow(name='default', on=on, env=env, jobs=jobs)
-  print(yaml.dump(resolve(workflow), sort_keys=False))
