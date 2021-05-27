@@ -1,3 +1,6 @@
 
 *.pyc
 .*.sw[op]
+
+output
+env

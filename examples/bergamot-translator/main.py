@@ -60,12 +60,22 @@ if __name__ == '__main__':
     for x in xs:
       ys.extend(x)
     return ys
+  
+  env = {
+    "gcc": 8,
+    "CCACHE_DIR": QuotedExpr(os.path.join(GitHubExpr('github.workspace'), '.ccache')),
+    "cache_cmd": QuotedExpr('bash ${GITHUB_WORKSPACE}/scripts/ci/compiler-hash.sh %compiler%'),
+    "cmake": QuotedExpr('-DCMAKE_BUILD_TYPE=Release -DCOMPILE_TESTS=on -DCOMPILE_SERVER=off'),
+    "brt_tags": QuotedExpr("'#native'")
+  }
 
   cached = Job(name='cached',
+              env=env,
              runs_on='ubuntu-18.04',
              steps=merge(setup, ccache(build), build_epilog, BRT()))
 
   fresh = Job(name='fresh',
+             env=env,
              needs=Needs(job=cached, result='failure'),
              runs_on='ubuntu-18.04',
              steps=merge(setup, build, build_epilog, BRT()))

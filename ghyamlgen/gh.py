@@ -31,6 +31,7 @@ class Job(YAMLRenderable):
   def __init__(self,
                name,
                runs_on,
+               env=None,
                outputs=None,
                condition=None,
                steps=None,
@@ -41,6 +42,7 @@ class Job(YAMLRenderable):
 
     self.fields = {
         "name": name,
+        "env": env,
         "needs": needs,
         "runs-on": runs_on,
         "outputs": outputs,
