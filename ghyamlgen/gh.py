@@ -20,7 +20,7 @@ class Workflow(YAMLRenderable):
 class Needs(YAMLRenderable):
 
   def __init__(self, job, result=None):
-    suffix = '' if result is None else '== {}'.format(result)
+    suffix = '' if result is None else '== \'{}\''.format(result)
     condition = "needs.{jobname}.result {suffix}".format(
         jobname=job.fields["name"], suffix=suffix)
     self.fields = {"needs": job.fields["needs"], "if": GitHubExpr(condition)}
@@ -86,10 +86,8 @@ class GHCache(YAMLRenderable):
         "name": "Cache-op for build-cache through ccache",
         "uses": "actions/cache@v2",
         "with": {
-            "path":
-                '${{ env.CCACHE_DIR }}',
-            "key":
-                "ccache-${{ matrix.name }}-${{ steps.ccache_vars.outputs.hash }}-${{ github.ref }}-${{ steps.ccache_vars.outputs.timestamp }}",
+            "path": '${{ env.CCACHE_DIR }}',
+            "key": "ccache-${{ matrix.name }}-${{ steps.ccache_vars.outputs.hash }}-${{ github.ref }}-${{ steps.ccache_vars.outputs.timestamp }}",
             "restore-keys":
                 Snippet('\n'.join([
                     "ccache-${{ matrix.name }}-${{ steps.ccache_vars.outputs.hash }}-${{ github.ref }}-",

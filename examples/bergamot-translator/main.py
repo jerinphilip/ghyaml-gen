@@ -3,7 +3,6 @@ import os
 
 basedir = os.path.dirname(os.path.abspath(__file__))
 root = os.path.join(basedir, "../../")
-print(root)
 sys.path.insert(0, root)
 
 from ghyamlgen import *
@@ -73,4 +72,4 @@ if __name__ == '__main__':
 
   jobs = {"cached": cached, "fresh": fresh}
   workflow = Workflow(name='default', on=on, env=env, jobs=jobs)
-  print(yaml.dump(resolve(workflow), sort_keys=False))
+  print(yaml.dump(resolve(workflow), sort_keys=False, width=1024))
