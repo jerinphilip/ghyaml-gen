@@ -23,7 +23,10 @@ class Needs(YAMLRenderable):
     suffix = '' if result is None else '== \'{}\''.format(result)
     condition = "needs.{jobname}.result {suffix}".format(
         jobname=job.fields["name"], suffix=suffix)
-    self.fields = {"needs": job.fields["name"], "if": GitHubExpr(condition)}
+    self.fields = {
+        "if": GitHubExpr(condition),
+        "needs": job.fields["name"],
+    }
 
 
 class Job(YAMLRenderable):
@@ -43,12 +46,11 @@ class Job(YAMLRenderable):
     self.fields = {
         "name": name,
         "env": env,
-        "needs": needs,
         "runs-on": runs_on,
-        "outputs": outputs,
         "if": condition,
-        "steps": steps,
         "needs": needed_job,
+        "steps": steps,
+        "outputs": outputs,
     }
 
 
@@ -83,13 +85,16 @@ class JobShellStep(YAMLRenderable):
 
 
 class GHCache(YAMLRenderable):
+
   def __init__(self):
     self.fields = {
         "name": "Cache-op for build-cache through ccache",
         "uses": "actions/cache@v2",
         "with": {
-            "path": '${{ env.CCACHE_DIR }}',
-            "key": "ccache-${{ github.job }}-${{ steps.ccache_vars.outputs.hash }}-${{ github.ref }}-${{ steps.ccache_vars.outputs.timestamp }}",
+            "path":
+                '${{ env.CCACHE_DIR }}',
+            "key":
+                "ccache-${{ github.job }}-${{ steps.ccache_vars.outputs.hash }}-${{ github.ref }}-${{ steps.ccache_vars.outputs.timestamp }}",
             "restore-keys":
                 Snippet('\n'.join([
                     "ccache-${{ github.job }}-${{ steps.ccache_vars.outputs.hash }}-${{ github.ref }}-",
