@@ -26,13 +26,13 @@ if __name__ == '__main__':
           "cmake",
           "examples/bergamot-translator/native-ubuntu/10-cmake-run.sh"),
       ImportedSnippet("Build from source",
-                      "examples/bergamot-translator/native-ubuntu/20-build.sh"),
+                      "examples/bergamot-translator/native-ubuntu/20-build.sh", working_directory="build"),
   ]
 
   def ccache(build):
     return [
-        GHCache(),
         CcacheVars(check=GitHubExpr('env.cache_cmd')),
+        GHCache(),
         CcacheEnv(check=GitHubExpr('env.cache_cmd'), 
             base_dir=GitHubExpr('github.workspace'), 
             directory=os.path.join(GitHubExpr('github.workspace'), '.ccache'),
@@ -69,17 +69,18 @@ if __name__ == '__main__':
     "brt_tags": QuotedExpr("'#native'")
   }
 
+
   cached = Job(name='cached',
-              env=env,
+             env=env,
              runs_on='ubuntu-18.04',
              steps=merge(setup, ccache(build), build_epilog, BRT()))
 
   fresh = Job(name='fresh',
-             env=env,
+          env=env,
              needs=Needs(job=cached, result='failure'),
              runs_on='ubuntu-18.04',
              steps=merge(setup, build, build_epilog, BRT()))
 
   jobs = {"cached": cached, "fresh": fresh}
-  workflow = Workflow(name='default', on=on, env=env, jobs=jobs)
+  workflow = Workflow(name='default', on=on, env=None, jobs=jobs)
   print(yaml.dump(resolve(workflow), sort_keys=False, width=1024))

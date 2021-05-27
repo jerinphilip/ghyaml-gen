@@ -23,7 +23,7 @@ class Needs(YAMLRenderable):
     suffix = '' if result is None else '== \'{}\''.format(result)
     condition = "needs.{jobname}.result {suffix}".format(
         jobname=job.fields["name"], suffix=suffix)
-    self.fields = {"needs": job.fields["needs"], "if": GitHubExpr(condition)}
+    self.fields = {"needs": job.fields["name"], "if": GitHubExpr(condition)}
 
 
 class Job(YAMLRenderable):
@@ -89,12 +89,12 @@ class GHCache(YAMLRenderable):
         "uses": "actions/cache@v2",
         "with": {
             "path": '${{ env.CCACHE_DIR }}',
-            "key": "ccache-${{ matrix.name }}-${{ steps.ccache_vars.outputs.hash }}-${{ github.ref }}-${{ steps.ccache_vars.outputs.timestamp }}",
+            "key": "ccache-${{ job.name }}-${{ steps.ccache_vars.outputs.hash }}-${{ github.ref }}-${{ steps.ccache_vars.outputs.timestamp }}",
             "restore-keys":
                 Snippet('\n'.join([
-                    "ccache-${{ matrix.name }}-${{ steps.ccache_vars.outputs.hash }}-${{ github.ref }}-",
-                    "ccache-${{ matrix.name }}-${{ steps.ccache_vars.outputs.hash }}-",
-                    "ccache-${{ matrix.name }}-",
+                    "ccache-${{ github.job }}-${{ steps.ccache_vars.outputs.hash }}-${{ github.ref }}-",
+                    "ccache-${{ github.job }}-${{ steps.ccache_vars.outputs.hash }}-",
+                    "ccache-${{ github.job }}-",
                 ]))
         }
     }
