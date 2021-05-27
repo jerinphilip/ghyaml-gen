@@ -32,8 +32,14 @@ if __name__ == '__main__':
 
   def ccache(build):
     return [
-        CcacheVars(check=GitHubExpr('matrix.cmd')),
-        CcacheEnv(),
+        GHCache(),
+        CcacheVars(check=GitHubExpr('env.cache_cmd')),
+        CcacheEnv(check=GitHubExpr('env.cache_cmd'), 
+            base_dir=GitHubExpr('github.workspace'), 
+            directory=os.path.join(GitHubExpr('github.workspace'), '.ccache'),
+            compress="true",
+            maxsize="100M"
+        ),
         CCacheProlog(),
         *build,
         CCacheEpilog(),
@@ -56,15 +62,15 @@ if __name__ == '__main__':
       ys.extend(x)
     return ys
 
-  job1 = Job(name='job1',
-             runs_on='ubuntu-16.04',
+  cached = Job(name='cached',
+             runs_on='ubuntu-18.04',
              steps=merge(setup, ccache(build), build_epilog, BRT()))
 
-  job2 = Job(name='job2',
-             needs=Needs(job=job1, result='success'),
-             runs_on='ubuntu-16.04',
+  fresh = Job(name='fresh',
+             needs=Needs(job=cached, result='failure'),
+             runs_on='ubuntu-18.04',
              steps=merge(setup, build, build_epilog, BRT()))
 
-  jobs = {"job1": job1, "job2": job2}
+  jobs = {"cached": cached, "fresh": fresh}
   workflow = Workflow(name='default', on=on, env=env, jobs=jobs)
   print(yaml.dump(resolve(workflow), sort_keys=False))

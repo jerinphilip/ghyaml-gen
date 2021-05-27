@@ -80,6 +80,26 @@ class JobShellStep(YAMLRenderable):
     }
 
 
+class GHCache(YAMLRenderable):
+  def __init__(self):
+    self.fields = {
+        "name": "Cache-op for build-cache through ccache",
+        "uses": "actions/cache@v2",
+        "with": {
+            "path":
+                '${{ env.CCACHE_DIR }}',
+            "key":
+                "ccache-${{ matrix.name }}-${{ steps.ccache_vars.outputs.hash }}-${{ github.ref }}-${{ steps.ccache_vars.outputs.timestamp }}",
+            "restore-keys":
+                Snippet('\n'.join([
+                    "ccache-${{ matrix.name }}-${{ steps.ccache_vars.outputs.hash }}-${{ github.ref }}-",
+                    "ccache-${{ matrix.name }}-${{ steps.ccache_vars.outputs.hash }}-",
+                    "ccache-${{ matrix.name }}-",
+                ]))
+        }
+    }
+
+
 class BRT(list):
 
   def __init__(self, working_directory='bergamot-translator-tests'):
@@ -89,7 +109,7 @@ class BRT(list):
                      run="make install"),
         JobShellStep(name="Run regression-tests (BRT)",
                      working_directory=working_directory,
-                     run="MARIAN=../build ./run_brt.sh ${{ matrix.test_tags }}")
+                     run="MARIAN=../build ./run_brt.sh ${{ env.brt_tags }}")
     ])
 
 
