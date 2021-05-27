@@ -32,7 +32,7 @@ class CcacheVars(JobShellStep):
   def __init__(self, check):
     ccache_vars = {"hash": check, "timestamp": "date '+%Y-%m-%dT%H.%M.%S'"}
     commands = [
-        'echo "::set-output name={key}::$({evalExpr})'.format(key=key,
+        'echo "::set-output name={key}::$({evalExpr})"'.format(key=key,
                                                               evalExpr=evalExpr)
         for key, evalExpr in ccache_vars.items()
     ]
