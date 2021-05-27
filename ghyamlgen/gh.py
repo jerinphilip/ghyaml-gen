@@ -1,12 +1,15 @@
 from . import YAMLRenderable, Snippet, GitHubExpr
 
+
 class On(YAMLRenderable):
+
   def __init__(self, push=None, pull_request=None, schedule=None):
     self.fields = {
         "push": push,
         "pull_request": pull_request,
         "schedule": schedule
     }
+
 
 class Workflow(YAMLRenderable):
 
@@ -15,15 +18,16 @@ class Workflow(YAMLRenderable):
 
 
 class Needs(YAMLRenderable):
-    def __init__(self, job, result=None):
-        suffix = '' if result is None else '== {}'.format(result)
-        condition = "needs.{jobname}.result {suffix}".format(jobname = job.fields["name"], suffix = suffix)
-        self.fields = {
-            "needs": job.fields["needs"],
-            "if": GitHubExpr(condition)
-        }
+
+  def __init__(self, job, result=None):
+    suffix = '' if result is None else '== {}'.format(result)
+    condition = "needs.{jobname}.result {suffix}".format(
+        jobname=job.fields["name"], suffix=suffix)
+    self.fields = {"needs": job.fields["needs"], "if": GitHubExpr(condition)}
+
 
 class Job(YAMLRenderable):
+
   def __init__(self,
                name,
                runs_on,
@@ -45,9 +49,11 @@ class Job(YAMLRenderable):
         "needs": needed_job,
     }
 
+
 class Group(YAMLRenderable):
-    def __init__(self, *renderables):
-        self.renderables = renderables
+
+  def __init__(self, *renderables):
+    self.renderables = renderables
 
 
 class Checkout(YAMLRenderable):
@@ -78,14 +84,12 @@ class BRT(list):
 
   def __init__(self, working_directory='bergamot-translator-tests'):
     super().__init__([
-        JobShellStep(
-            name="Install regression-test framework (BRT)",
-            working_directory=working_directory,
-            run="make install"),
-        JobShellStep(
-            name="Run regression-tests (BRT)",
-            working_directory=working_directory,
-            run="MARIAN=../build ./run_brt.sh ${{ matrix.test_tags }}")
+        JobShellStep(name="Install regression-test framework (BRT)",
+                     working_directory=working_directory,
+                     run="make install"),
+        JobShellStep(name="Run regression-tests (BRT)",
+                     working_directory=working_directory,
+                     run="MARIAN=../build ./run_brt.sh ${{ matrix.test_tags }}")
     ])
 
 
@@ -95,5 +99,6 @@ class ImportedSnippet(JobShellStep):
     contents = None
     with open(fpath) as fp:
       contents = fp.read().strip()
-    super().__init__(name=name, run=contents, working_directory=working_directory)
-
+    super().__init__(name=name,
+                     run=contents,
+                     working_directory=working_directory)

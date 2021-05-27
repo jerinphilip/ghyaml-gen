@@ -1,5 +1,5 @@
-
 class Snippet(str):
+
   @staticmethod
   def representer(dumper, data):
     if len(data.splitlines()) > 1:  # check for multiline string
@@ -8,9 +8,10 @@ class Snippet(str):
 
 
 class GitHubExpr(str):
+
   def __new__(cls, value):
-      value = '${{ ' + value + ' }}'
-      return str.__new__(cls, value)
+    value = '${{ ' + value + ' }}'
+    return str.__new__(cls, value)
 
   @staticmethod
   def representer(dumper, data):

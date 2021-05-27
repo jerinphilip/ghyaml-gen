@@ -77,9 +77,6 @@ if __name__ == '__main__':
           *BRT(),
       ])
 
-
-
-
-  jobs = {"job1": job1, "job2" :job2}
+  jobs = {"job1": job1, "job2": job2}
   workflow = Workflow(name='default', on=on, env=env, jobs=jobs)
   print(yaml.dump(resolve(workflow), sort_keys=False))

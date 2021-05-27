@@ -1,5 +1,6 @@
 from .gh import JobShellStep
 
+
 class CcacheEnv(JobShellStep):
 
   def __init__(self,
@@ -17,8 +18,9 @@ class CcacheEnv(JobShellStep):
     }
 
     commands = [
-        'echo "CCACHE_{key}={value}" >> $GITHUB_ENV'.format(
-            key=key, value=value) for key, value in env.items()
+        'echo "CCACHE_{key}={value}" >> $GITHUB_ENV'.format(key=key,
+                                                            value=value)
+        for key, value in env.items()
     ]
 
     run = '\n'.join(commands)
@@ -30,29 +32,31 @@ class CcacheVars(JobShellStep):
   def __init__(self, check):
     ccache_vars = {"hash": check, "timestamp": "date '+%Y-%m-%dT%H.%M.%S'"}
     commands = [
-        'echo "::set-output name={key}::$({evalExpr})'.format(
-            key=key, evalExpr=evalExpr)
+        'echo "::set-output name={key}::$({evalExpr})'.format(key=key,
+                                                              evalExpr=evalExpr)
         for key, evalExpr in ccache_vars.items()
     ]
 
-    super().__init__(
-        name="Generate ccache_vars for ccache based on machine",
-        run='\n'.join(commands),
-        id="ccache_vars",
-        shell="bash"
-    )
+    super().__init__(name="Generate ccache_vars for ccache based on machine",
+                     run='\n'.join(commands),
+                     id="ccache_vars",
+                     shell="bash")
+
 
 class CCacheProlog(JobShellStep):
-    def __init__(self):
-        commands = [
-            'ccache -s # Print current cache stats',
-            'ccache -z # Zero cache entry',
-        ]
-        super().__init__(name="ccache prolog", run = '\n'.join(commands))
+
+  def __init__(self):
+    commands = [
+        'ccache -s # Print current cache stats',
+        'ccache -z # Zero cache entry',
+    ]
+    super().__init__(name="ccache prolog", run='\n'.join(commands))
+
 
 class CCacheEpilog(JobShellStep):
-    def __init__(self):
-        commands = [
-            'ccache -s # Print current cache stats',
-        ]
-        super().__init__(name="ccache epilog", run = '\n'.join(commands))
+
+  def __init__(self):
+    commands = [
+        'ccache -s # Print current cache stats',
+    ]
+    super().__init__(name="ccache epilog", run='\n'.join(commands))

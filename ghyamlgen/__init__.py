@@ -5,8 +5,10 @@ from .yml import GitHubExpr, Snippet
 yaml.add_representer(Snippet, Snippet.representer)
 yaml.add_representer(GitHubExpr, GitHubExpr.representer)
 
+
 class YAMLRenderable:
-    pass
+  pass
+
 
 def resolve(cls):
   native = None
@@ -23,6 +25,7 @@ def resolve(cls):
     native = cls
 
   return native
+
 
 from .gh import *
 from .ccache import *
