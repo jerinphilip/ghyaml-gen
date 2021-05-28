@@ -1,4 +1,4 @@
-from . import YAMLRenderable, Snippet, GitHubExpr
+from . import YAMLRenderable, Snippet, GitHubExpr, QuotedExpr
 
 
 class On(YAMLRenderable):
@@ -21,6 +21,7 @@ class Job(YAMLRenderable):
 
   def __init__(
       self,
+      id,
       name,
       runs_on,
       env=None,
@@ -29,6 +30,7 @@ class Job(YAMLRenderable):
       steps=None,
   ):
 
+    self._id = id
     self.fields = {
         "name": name,
         "env": env,
@@ -39,14 +41,14 @@ class Job(YAMLRenderable):
         "outputs": outputs,
     }
 
-  def name(self):
-    return self.fields["name"]
+  def id(self):
+    return self._id
 
   def needs(self, job, OpExpr):
     condition = "{}".format(OpExpr(job))
     fields = {
         "if": condition,
-        "needs": job.fields["name"],
+        "needs": job.id(),
     }
 
     self.fields.update(fields)
@@ -72,13 +74,20 @@ class Checkout(YAMLRenderable):
 
 class JobShellStep(YAMLRenderable):
 
-  def __init__(self, name, run, working_directory=None, shell=None, id=None):
+  def __init__(self,
+               name,
+               run,
+               working_directory=None,
+               shell=None,
+               id=None,
+               condition=None):
     self.fields = {
         "name": name,
         "working-directory": working_directory,
         "shell": shell,
         "id": id,
         "run": Snippet(run) if '\n' in run else run,
+        "if": condition
     }
 
 
@@ -100,12 +109,11 @@ class GHCache(YAMLRenderable):
         "uses": "actions/cache@v2",
         "with": {
             "path":
-                GitHubExpr('env.ccache_dir'),
+            GitHubExpr('env.ccache_dir'),
             "key":
-                transform(keys),
+            transform(keys),
             "restore-keys":
-                Snippet('\n'.join(
-                    [transform(keys[:-i]) for i in range(len(keys))]))
+            Snippet('\n'.join([transform(keys[:-i]) for i in range(len(keys))]))
         }
     }
 
@@ -119,13 +127,13 @@ class UploadArtifacts(YAMLRenderable):
         "if": GitHubExpr("always()"),
         "with": {
             "name":
-                "brt-{}".format(GitHubExpr("github.job")),
+            "brt-{}".format(GitHubExpr("github.job")),
             "path":
-                Snippet('\n'.join([
-                    "bergamot-translator-tests/**/*.expected",
-                    "bergamot-translator-tests/**/*.log",
-                    "bergamot-translator-tests/**/*.out",
-                ])),
+            Snippet('\n'.join([
+                "bergamot-translator-tests/**/*.expected",
+                "bergamot-translator-tests/**/*.log",
+                "bergamot-translator-tests/**/*.out",
+            ])),
         }
     }
 
@@ -134,33 +142,38 @@ class BRT(list):
 
   def __init__(self, working_directory='bergamot-translator-tests'):
     super().__init__([
-        JobShellStep(name="Install regression-test framework (BRT)",
-                     working_directory=working_directory,
-                     run="make install"),
-        JobShellStep(name="Run regression-tests (BRT)",
-                     working_directory=working_directory,
-                     run="MARIAN=../build ./run_brt.sh ${{ env.brt_tags }}"),
+        JobShellStep(
+            name="Install regression-test framework (BRT)",
+            working_directory=working_directory,
+            run="make install"),
+        JobShellStep(
+            name="Run regression-tests (BRT)",
+            working_directory=working_directory,
+            run="MARIAN=../build ./run_brt.sh ${{ env.brt_tags }}"),
         UploadArtifacts()
     ])
 
 
 class ImportedSnippet(JobShellStep):
 
-  def __init__(self, name, fpath, working_directory=None):
+  def __init__(self, name, fpath, working_directory=None, condition=None):
     contents = None
     with open(fpath) as fp:
       contents = fp.read().strip()
-    super().__init__(name=name,
-                     run=contents,
-                     working_directory=working_directory)
+    super().__init__(
+        name=name,
+        run=contents,
+        working_directory=working_directory,
+        condition=condition)
 
 
 class HardFailBash(JobShellStep):
 
   def __init__(self):
-    super().__init__(name="Hard fail to check trigger for other workflow",
-                     run='exit 1',
-                     shell='bash')
+    super().__init__(
+        name="Hard fail to check trigger for other workflow",
+        run='exit 1',
+        shell='bash')
 
 
 class LogContext(YAMLRenderable):
@@ -170,7 +183,7 @@ class LogContext(YAMLRenderable):
         "name": "Dump {} context".format(context),
         "env": {
             "{}_CONTEXT".format(context.upper()):
-                GitHubExpr('toJSON({})'.format(context))
+            GitHubExpr('toJSON({})'.format(context))
         },
         "run": "echo ${}_CONTEXT".format(context.upper())
     }
