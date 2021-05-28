@@ -24,13 +24,14 @@ def ccache(build, env):
 
   ccache_cmake_args = '-DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_C_COMPILER_LAUNCHER=ccache'
   build = [
-      CcacheVars(check=GitHubExpr('env.ccache_compilercheck')),
+      CcacheVars(check=GitHubExpr('env.ccache_compilercheck'), cmd=False),
       GHCache(),
-      CcacheEnv(check=GitHubExpr('env.ccache_compilercheck'),
-                base_dir=GitHubExpr('github.workspace'),
-                directory=GitHubExpr('env.ccache_dir'),
-                compress="true",
-                maxsize="50M"),
+      CcacheEnv(
+          check=GitHubExpr('env.ccache_compilercheck'),
+          base_dir=GitHubExpr('github.workspace'),
+          directory=GitHubExpr('env.ccache_dir'),
+          compress="true",
+          maxsize="50M"),
       CCacheProlog(),
       *build,
       CCacheEpilog(),
@@ -38,9 +39,9 @@ def ccache(build, env):
 
   env.update({
       "ccache_dir":
-          QuotedExpr(os.path.join(GitHubExpr('github.workspace'), '.ccache')),
+      QuotedExpr(os.path.join(GitHubExpr('github.workspace'), '.ccache')),
       "ccache_compilercheck":
-          'content'
+      'content'
       # QuotedExpr(
       #     'bash ${GITHUB_WORKSPACE}/scripts/ci/compiler-hash.sh %compiler%'),
   })
@@ -84,25 +85,27 @@ class MarianBuild:
         id = '{}_fresh'.format(id)
         name = '{} (fresh build)'.format(name)
 
-      return Job(id=id,
-                 name=name,
-                 env=env,
-                 runs_on=self.os,
-                 steps=merge(Checkout(), self.setup, build, self.build_epilog,
-                             self.brt))
+      return Job(
+          id=id,
+          name=name,
+          env=env,
+          runs_on=self.os,
+          steps=merge(Checkout(), self.setup, build, self.build_epilog,
+                      self.brt))
 
     cached = CJob(with_cache=True)
     fresh = CJob(with_cache=False)
     fresh.needs(job=cached, OpExpr=RunIfFailed),
 
-    log = Job(id='{}_log'.format(self.id),
-              name='Log a few contexts',
-              env=None,
-              runs_on=self.os,
-              steps=[
-                  LogContext('needs'),
-                  Evaluate("needs.cached.result == 'failure'")
-              ])
+    log = Job(
+        id='{}_log'.format(self.id),
+        name='Log a few contexts',
+        env=None,
+        runs_on=self.os,
+        steps=[
+            LogContext('needs'),
+            Evaluate("needs.cached.result == 'failure'")
+        ])
 
     log.needs(job=cached, OpExpr=Always)
 
@@ -130,9 +133,10 @@ def ubuntu():
       ImportedSnippet(
           "cmake",
           "examples/bergamot-translator/native-ubuntu/10-cmake-run.sh"),
-      ImportedSnippet("Build from source",
-                      "examples/bergamot-translator/native-ubuntu/20-build.sh",
-                      working_directory="build"),
+      ImportedSnippet(
+          "Build from source",
+          "examples/bergamot-translator/native-ubuntu/20-build.sh",
+          working_directory="build"),
   ]
 
   build_epilog = [
@@ -194,9 +198,8 @@ def mac():
   build = [
       ImportedSnippet(
           "cmake", "examples/bergamot-translator/native-mac/10-cmake-run.sh"),
-      JobShellStep(name="Build from source",
-                   run="make -j2",
-                   working_directory="build"),
+      JobShellStep(
+          name="Build from source", run="make -j2", working_directory="build"),
   ]
 
   build_epilog = [
@@ -214,19 +217,19 @@ def mac():
   envs = {
       "full": {
           'cmake':
-              '-DCOMPILE_TESTS=on -DUSE_APPLE_ACCELERATE=off -DUSE_FBGEMM=off -DUSE_STATIC_LIBS=off',
+          '-DCOMPILE_TESTS=on -DUSE_APPLE_ACCELERATE=off -DUSE_FBGEMM=off -DUSE_STATIC_LIBS=off',
           "brt_tags":
-              QuotedExpr("'#mac'"),
+          QuotedExpr("'#mac'"),
           'unittests':
-              True
+          True
       },
       "minimal": {
           'cmake':
-              '-DCOMPILE_TESTS=off -DUSE_APPLE_ACCELERATE=off -DUSE_FBGEMM=off -DUSE_STATIC_LIBS=on -DUSE_WASM_COMPATIBLE_SOURCE=on',
+          '-DCOMPILE_TESTS=off -DUSE_APPLE_ACCELERATE=off -DUSE_FBGEMM=off -DUSE_STATIC_LIBS=on -DUSE_WASM_COMPATIBLE_SOURCE=on',
           'brt_tags':
-              QuotedExpr("'#wasm'"),
+          QuotedExpr("'#wasm'"),
           'unittests':
-              False
+          False
       }
   }
 
@@ -260,9 +263,8 @@ def wasm():
   build = [
       ImportedSnippet(
           "cmake", "examples/bergamot-translator/native-mac/10-cmake-run.sh"),
-      JobShellStep(name="Build from source",
-                   run="make -j2",
-                   working_directory="build"),
+      JobShellStep(
+          name="Build from source", run="make -j2", working_directory="build"),
   ]
 
   build_epilog = [
@@ -280,19 +282,19 @@ def wasm():
   envs = {
       "full": {
           'cmake':
-              '-DCOMPILE_TESTS=on -DUSE_APPLE_ACCELERATE=off -DUSE_FBGEMM=off -DUSE_STATIC_LIBS=off',
+          '-DCOMPILE_TESTS=on -DUSE_APPLE_ACCELERATE=off -DUSE_FBGEMM=off -DUSE_STATIC_LIBS=off',
           "brt_tags":
-              QuotedExpr("'#mac'"),
+          QuotedExpr("'#mac'"),
           'unittests':
-              True
+          True
       },
       "minimal": {
           'cmake':
-              '-DCOMPILE_TESTS=off -DUSE_APPLE_ACCELERATE=off -DUSE_FBGEMM=off -DUSE_STATIC_LIBS=on -DUSE_WASM_COMPATIBLE_SOURCE=on',
+          '-DCOMPILE_TESTS=off -DUSE_APPLE_ACCELERATE=off -DUSE_FBGEMM=off -DUSE_STATIC_LIBS=on -DUSE_WASM_COMPATIBLE_SOURCE=on',
           'brt_tags':
-              QuotedExpr("'#wasm'"),
+          QuotedExpr("'#wasm'"),
           'unittests':
-              False,
+          False,
       }
   }
 
