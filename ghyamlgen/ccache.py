@@ -29,7 +29,9 @@ class CcacheEnv(JobShellStep):
 class CcacheVars(JobShellStep):
 
   def __init__(self, check):
-    ccache_vars = {"hash": check, "timestamp": "date '+%Y-%m-%dT%H.%M.%S'"}
+    # check can be string value or command, so
+    safeCheck = "{check} || echo {check}".format(check=check)
+    ccache_vars = {"hash": safeCheck, "timestamp": "date '+%Y-%m-%dT%H.%M.%S'"}
     commands = [
         'echo "::set-output name={key}::$({evalExpr})"'.format(
             key=key, evalExpr=evalExpr)

@@ -80,14 +80,15 @@ class JobShellStep(YAMLRenderable):
                working_directory=None,
                shell=None,
                id=None,
-               condition=None):
+               condition=None, continue_on_error=None):
     self.fields = {
         "name": name,
         "working-directory": working_directory,
         "shell": shell,
         "id": id,
         "run": Snippet(run) if '\n' in run else run,
-        "if": condition
+        "if": condition,
+        "continue-on-error": continue_on_error
     }
 
 
@@ -108,12 +109,9 @@ class GHCache(YAMLRenderable):
         "name": "Cache-op for build-cache through ccache",
         "uses": "actions/cache@v2",
         "with": {
-            "path":
-            GitHubExpr('env.ccache_dir'),
-            "key":
-            transform(keys),
-            "restore-keys":
-            Snippet('\n'.join([transform(keys[:-i]) for i in range(len(keys))]))
+            "path": GitHubExpr('env.ccache_dir'),
+            "key": transform(keys),
+            "restore-keys": Snippet('\n'.join([transform(keys[:-i]) for i in range(1, len(keys))]))
         }
     }
 
@@ -124,7 +122,7 @@ class UploadArtifacts(YAMLRenderable):
     self.fields = {
         "name": "Upload regression-tests artifacts",
         "uses": "actions/upload-artifact@v2",
-        "if": GitHubExpr("always()"),
+        # "if": GitHubExpr("always()"),
         "with": {
             "name":
             "brt-{}".format(GitHubExpr("github.job")),
@@ -141,6 +139,7 @@ class UploadArtifacts(YAMLRenderable):
 class BRT(list):
 
   def __init__(self, working_directory='bergamot-translator-tests'):
+    brt_id = 'brt_run'
     super().__init__([
         JobShellStep(
             name="Install regression-test framework (BRT)",
@@ -148,8 +147,17 @@ class BRT(list):
             run="make install"),
         JobShellStep(
             name="Run regression-tests (BRT)",
+            id=brt_id,
             working_directory=working_directory,
-            run="MARIAN=../build ./run_brt.sh ${{ env.brt_tags }}"),
+            run="MARIAN=../build ./run_brt.sh ${{ env.brt_tags }}",
+            continue_on_error=True
+            ),
+        JobShellStep(
+            name="Print logs of unsuccessful BRTs",
+            working_directory=working_directory,
+            run="grep \"test*.sh\" previous.log | cut -f '-' -d 2 | xargs -I% tail -n100 -v %",
+            condition=GitHubExpr("{} == 'failure'".format("steps.{}.outcome".format(brt_id)))
+        ),
         UploadArtifacts()
     ])
 

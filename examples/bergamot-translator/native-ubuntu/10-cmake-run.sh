@@ -1,4 +1,4 @@
 mkdir -p build
 cd build
-CC=/usr/bin/gcc-${{ env.gcc }} CXX=/usr/bin/g++-${{ env.gcc }} CUDAHOSTCXX=/usr/bin/g++-${{ env.gcc }} \
+CC=${{ env.cc }} CXX=${{ env.cxx }} CUDAHOSTCXX=${{ env.cxx }} \
 cmake -L .. ${{ env.cmake }}
