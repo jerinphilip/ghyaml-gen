@@ -18,8 +18,9 @@ class CcacheEnv(JobShellStep):
     }
 
     commands = [
-        'echo "CCACHE_{key}={value}" >> $GITHUB_ENV'.format(
-            key=key, value=value) for key, value in env.items()
+        'echo "CCACHE_{key}={value}" >> $GITHUB_ENV'.format(key=key,
+                                                            value=value)
+        for key, value in env.items()
     ]
 
     run = '\n'.join(commands)
@@ -38,11 +39,10 @@ class CcacheVars(JobShellStep):
         for key, evalExpr in ccache_vars.items()
     ]
 
-    super().__init__(
-        name="Generate ccache_vars for ccache based on machine",
-        run='\n'.join(commands),
-        id="ccache_vars",
-        shell="bash")
+    super().__init__(name="Generate ccache_vars for ccache based on machine",
+                     run='\n'.join(commands),
+                     id="ccache_vars",
+                     shell="bash")
 
 
 class CCacheProlog(JobShellStep):
