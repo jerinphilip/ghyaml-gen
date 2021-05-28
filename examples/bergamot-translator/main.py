@@ -218,7 +218,7 @@ def mac():
           "brt_tags":
               QuotedExpr("'#mac'"),
           'unittests':
-              "{}".format(GitHubExpr("true"))
+              True
       },
       "minimal": {
           'cmake':
@@ -226,7 +226,7 @@ def mac():
           'brt_tags':
               QuotedExpr("'#wasm'"),
           'unittests':
-              "{}".format(GitHubExpr('false'))
+              False
       }
   }
 
