@@ -1,13 +1,14 @@
-from . import YAMLRenderable, Snippet, GitHubExpr, QuotedExpr
+from . import YAMLRenderable, Snippet, GitHubExpr, QuotedExpr, GitHubMapping
 
 
 class On(YAMLRenderable):
 
-  def __init__(self, push=None, pull_request=None, schedule=None):
+  def __init__(self, push=None, pull_request=None, schedule=None, workflow_dispatch=None):
     self.fields = {
         "push": push,
         "pull_request": pull_request,
-        "schedule": schedule
+        "schedule": schedule,
+        "workflow_dispatch": workflow_dispatch
     }
 
 
@@ -54,6 +55,38 @@ class Job(YAMLRenderable):
     self.fields.update(fields)
 
 
+class MatrixJob(YAMLRenderable):
+
+  def __init__(
+      self,
+      id,
+      matrix,
+      env=None,
+      outputs=None,
+      condition=None,
+      steps=None,
+  ):
+
+    self._id = id
+    self.fields = {
+        "strategy": {
+            "fail-fast": False,
+            "matrix": matrix,
+        },
+        "name": GitHubExpr(GitHubMapping('name', context='matrix')),
+        "runs-on": GitHubExpr(GitHubMapping('os', context='matrix')),
+        "env": env,
+        "if": condition,
+        "needs": None,
+        "steps": steps,
+        "outputs": outputs,
+
+    }
+
+  def id(self):
+    return self._id
+
+
 class Group(YAMLRenderable):
 
   def __init__(self, *renderables):
@@ -62,13 +95,14 @@ class Group(YAMLRenderable):
 
 class Checkout(YAMLRenderable):
 
-  def __init__(self):
+  def __init__(self, ref=None):
     self.fields = {
         "name": "Checkout",
         "uses": "actions/checkout@v2",
         "with": {
             "submodules": "recursive"
-        }
+        },
+        "ref": ref
     }
 
 
@@ -95,15 +129,7 @@ class JobShellStep(YAMLRenderable):
 
 class GHCache(YAMLRenderable):
 
-  def __init__(self):
-
-    keys = [
-        GitHubExpr('github.job'),
-        GitHubExpr('steps.ccache_vars.outputs.hash'),
-        GitHubExpr('github.ref'),
-        GitHubExpr('steps.ccache_vars.outputs.timestamp')
-    ]
-
+  def __init__(self, keys, cache_dir):
     transform = lambda keys: '-'.join(['ccache'] + keys)
 
     self.fields = {
@@ -111,7 +137,8 @@ class GHCache(YAMLRenderable):
         "uses": "actions/cache@v2",
         "with": {
             "path":
-            GitHubExpr('env.ccache_dir'),
+            cache_dir,
+            # GitHubExpr('env.ccache_dir'),
             "key":
             transform(keys),
             "restore-keys":
@@ -123,28 +150,31 @@ class GHCache(YAMLRenderable):
 
 class UploadArtifacts(YAMLRenderable):
 
-  def __init__(self):
+  def __init__(self, identifier, condition=None):
     self.fields = {
         "name": "Upload regression-tests artifacts",
         "uses": "actions/upload-artifact@v2",
-        # "if": GitHubExpr("always()"),
+        "if": condition,
         "with": {
             "name":
-            "brt-{}".format(GitHubExpr("github.job")),
+            "brt-{}".format(identifier),
             "path":
             Snippet('\n'.join([
                 "bergamot-translator-tests/**/*.expected",
                 "bergamot-translator-tests/**/*.log",
                 "bergamot-translator-tests/**/*.out",
             ])),
-        }
+        },
     }
 
 
 class BRT(list):
 
-  def __init__(self, working_directory='bergamot-translator-tests'):
+  def __init__(self, jobid, tags,
+               working_directory='bergamot-translator-tests'):
     brt_id = 'brt_run'
+    brt_failure = GitHubExpr("always() && {} == 'failure'".format("steps.{}.outcome".format(brt_id)))
+    brt_unskipped = GitHubExpr("always() && {} != 'skipped'".format("steps.{}.outcome".format(brt_id)))
     super().__init__([
         JobShellStep(
             name="Install regression-test framework (BRT)",
@@ -154,16 +184,13 @@ class BRT(list):
             name="Run regression-tests (BRT)",
             id=brt_id,
             working_directory=working_directory,
-            run="MARIAN=../build ./run_brt.sh ${{ env.brt_tags }}",
-            continue_on_error=True),
+            run="MARIAN=../build ./run_brt.sh {}".format(tags)),
         JobShellStep(
             name="Print logs of unsuccessful BRTs",
             working_directory=working_directory,
-            run=
-            "grep \"test*.sh\" previous.log | cut -f '-' -d 2 | xargs -I% tail -n100 -v %",
-            condition=GitHubExpr("{} == 'failure'".format(
-                "steps.{}.outcome".format(brt_id)))),
-        UploadArtifacts()
+            run="grep \"tests.*.sh\" previous.log  | sed 's/^\s*-\s*//' | xargs -I% tail -n100 -v %.log",
+            condition=brt_failure),
+        UploadArtifacts(jobid, condition=brt_unskipped)
     ])
 
 
@@ -212,3 +239,12 @@ class Evaluate(YAMLRenderable):
         },
         "run": "echo $EXPR_VALUE"
     }
+
+def RunIfFailed(job):
+  return GitHubExpr("always() && {} == 'failure'".format(
+      "needs.{jobid}.result".format(jobid=job.id())))
+
+
+def Always(job):
+  return GitHubExpr("always()")
+

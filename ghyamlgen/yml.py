@@ -18,6 +18,17 @@ class GitHubExpr(str):
     return dumper.represent_scalar('tag:yaml.org,2002:str', data)
 
 
+class GitHubMapping(str):
+
+  def __new__(cls, key, context='env'):
+    value = '{}.{}'.format(context, key)
+    return str.__new__(cls, value)
+
+  @staticmethod
+  def representer(dumper, data):
+    return dumper.represent_scalar('tag:yaml.org,2002:str', data)
+
+
 class QuotedExpr(str):
 
   @staticmethod

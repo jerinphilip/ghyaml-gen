@@ -3,18 +3,13 @@ from .gh import JobShellStep
 
 class CcacheEnv(JobShellStep):
 
-  def __init__(self,
-               check=None,
-               base_dir=None,
-               directory=None,
-               compress=None,
-               maxsize=None):
+  def __init__(self, config):
     env = {
-        'COMPILER_CHECK': check,
-        'BASE_DIR': base_dir,
-        'COMPRESS': compress,
-        'DIR': directory,
-        'MAXSIZE': maxsize
+        'COMPILER_CHECK': config["compilercheck"],
+        'BASE_DIR': config["base_dir"],
+        'COMPRESS': config["compress"],
+        'DIR': config["dir"],
+        'MAXSIZE': config["maxsize"]
     }
 
     commands = [

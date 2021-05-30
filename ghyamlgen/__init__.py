@@ -1,10 +1,11 @@
 import yaml
 
-from .yml import GitHubExpr, Snippet, QuotedExpr
+from .yml import GitHubExpr, Snippet, QuotedExpr, GitHubMapping
 
 yaml.add_representer(Snippet, Snippet.representer)
 yaml.add_representer(GitHubExpr, GitHubExpr.representer)
 yaml.add_representer(QuotedExpr, QuotedExpr.representer)
+yaml.add_representer(GitHubMapping, GitHubMapping.representer)
 
 
 class YAMLRenderable:
