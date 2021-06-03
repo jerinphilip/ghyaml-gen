@@ -8,6 +8,7 @@ sys.path.insert(0, root)
 
 from ghyamlgen import *
 
+
 def merge(*xs):
   ys = []
   for x in xs:
@@ -16,6 +17,7 @@ def merge(*xs):
     else:
       ys.append(x)
   return ys
+
 
 def ccache(build):
   build = deepcopy(build)
@@ -30,12 +32,18 @@ def ccache(build):
             GitHubExpr('github.ref'),
             GitHubExpr('steps.ccache_vars.outputs.timestamp')
         ],
-        "compilercheck": f("ccache_compilercheck"),
-        "base_dir": f("ccache_base_dir"),
-        "dir": f("ccache_dir"),
-        "compress": f("ccache_compress"),
-        "maxsize": f("ccache_maxsize"),
-        "is_command": False
+        "compilercheck":
+        f("ccache_compilercheck"),
+        "basedir": f("ccache_basedir"),
+        "dir":
+        f("ccache_dir"),
+        "compress":
+        f("ccache_compress"),
+        "compresslevel": f("ccache_compresslevel"),
+        "maxsize":
+        f("ccache_maxsize"),
+        "is_command":
+        False
     }
     return ccache_config
 
@@ -49,8 +57,8 @@ def ccache(build):
       CCacheEpilog(),
   ]
 
-
   return build
+
 
 class MarianBuild:
 
@@ -63,8 +71,7 @@ class MarianBuild:
     self.build = build
     self.build_epilog = build_epilog
     self.brt = brt
-  
-  
+
   def constructJob(self, with_cache=False):
     build = ccache(self.build) if with_cache else self.build
     name = self.name
@@ -73,7 +80,12 @@ class MarianBuild:
       id = '{}_fresh'.format(id)
       name = '{} (fresh build)'.format(name)
 
-    return Job(id=id, name=name, env=env, runs_on=self.os, steps=merge(Checkout(), self.setup, build, self.build_epilog, self.brt))
+    return Job(
+        id=id,
+        name=name,
+        env=env,
+        runs_on=self.os,
+        steps=merge(Checkout(), self.setup, build, self.build_epilog, self.brt))
 
   def constructMatrixJob(self, matrix, with_cache=False):
     build = ccache(self.build) if with_cache else self.build
@@ -93,27 +105,27 @@ class MarianBuild:
     return {cached.id(): cached}
     # return cached_flow(cached, fresh)
 
+
 def cached_flow(cached: Job, fresh: Job):
-    fresh.needs(job=cached, OpExpr=RunIfFailed),
-    log = Job(
-        id='{}_log'.format(self.id),
-        name='Log a few contexts',
-        env=None,
-        runs_on=self.os,
-        steps=[
-            LogContext('needs'),
-            Evaluate("needs.cached.result == 'failure'")
-        ])
+  fresh.needs(job=cached, OpExpr=RunIfFailed),
+  log = Job(
+      id='{}_log'.format(self.id),
+      name='Log a few contexts',
+      env=None,
+      runs_on=self.os,
+      steps=[LogContext('needs'),
+             Evaluate("needs.cached.result == 'failure'")])
 
-    log.needs(job=cached, OpExpr=Always)
+  log.needs(job=cached, OpExpr=Always)
 
-    jobs = [
-        cached,
-        # fresh,
-        #log
-    ]
-    jobdict = {job.id(): job for job in jobs}
-    return jobdict
+  jobs = [
+      cached,
+      # fresh,
+      #log
+  ]
+  jobdict = {job.id(): job for job in jobs}
+  return jobdict
+
 
 def ubuntu():
   setup = [
@@ -135,20 +147,19 @@ def ubuntu():
           working_directory="build"),
   ]
 
-
   def build_epilog(context):
-      return [
-      ImportedSnippet(
-          "Print Versions",
-          "examples/bergamot-translator/native-ubuntu/21-print-versions.sh",
-          working_directory='build'),
-      ImportedSnippet(
-          "Run unit tests",
-          "examples/bergamot-translator/native-ubuntu/30-unit-tests.sh",
-          working_directory='build',
-          condition=GitHubExpr("{} == 'true'".format(
-              GitHubMapping('unittests', context=context)))),
-      ]
+    return [
+        ImportedSnippet(
+            "Print Versions",
+            "examples/bergamot-translator/native-ubuntu/21-print-versions.sh",
+            working_directory='build'),
+        ImportedSnippet(
+            "Run unit tests",
+            "examples/bergamot-translator/native-ubuntu/30-unit-tests.sh",
+            working_directory='build',
+            condition=GitHubExpr("{} == 'true'".format(
+                GitHubMapping('unittests', context=context)))),
+    ]
 
   configs = {
       "full": {
@@ -163,10 +174,7 @@ def ubuntu():
       }
   }
 
-  matrix = {
-     "include": [
-     ]
-  }
+  matrix = {"include": []}
 
   def platform_ubuntu(version, env_name):
     platform = {
@@ -186,35 +194,49 @@ def ubuntu():
           "cmake": env["cmake"],
           "brt_tags": env["brt_tags"],
           "unittests": env["unittests"]
-        })
-      
+      })
+
   # print(yaml.dump(matrix, sort_keys=False))
 
   def build_env_jobs():
-      jobs = {}
-      for version in ['18.04', '20.04']:
-          for env_name, env in configs.items():
-            platform = platform_ubuntu(version, env_name)
-            tags = GitHubExpr(GitHubMapping('brt_tags', context='env'))
-            jobid = GitHubExpr(GitHubMapping('job', context='github'))
+    jobs = {}
+    for version in ['18.04', '20.04']:
+      for env_name, env in configs.items():
+        platform = platform_ubuntu(version, env_name)
+        tags = GitHubExpr(GitHubMapping('brt_tags', context='env'))
+        jobid = GitHubExpr(GitHubMapping('job', context='github'))
 
-            # env = None
-            variations = MarianBuild(platform["id"], platform["name"], platform["os"],
-                                     env, setup, build, build_epilog(context='env'), BRT(jobid, tags))
-            jobs.update(variations.generate())
-      return jobs
-  
+        # env = None
+        variations = MarianBuild(
+            platform["id"],
+            platform["name"],
+            platform["os"],
+            env,
+            setup,
+            build,
+            build_epilog(context='env'),
+            BRT(jobid, tags))
+        jobs.update(variations.generate())
+    return jobs
+
   def build_matrix_jobs(matrix):
-      name = GitHubExpr(GitHubMapping('name', context='matrix'))
-      os = GitHubExpr(GitHubMapping('os', context='matrix'))
-      env = None
-      jobid = GitHubExpr(GitHubMapping('identifier', context='matrix'))
-      tags = GitHubExpr(GitHubMapping('brt_tags', context='matrix'))
-      matrix_build = MarianBuild("ubuntu", name, os, env, setup, build, build_epilog(context='matrix'), BRT(jobid, tags))
-      matrix_job = matrix_build.constructMatrixJob(matrix, with_cache=True)
-      return {matrix_job.id(): matrix_job}
+    name = GitHubExpr(GitHubMapping('name', context='matrix'))
+    os = GitHubExpr(GitHubMapping('os', context='matrix'))
+    env = None
+    jobid = GitHubExpr(GitHubMapping('identifier', context='matrix'))
+    tags = GitHubExpr(GitHubMapping('brt_tags', context='matrix'))
+    matrix_build = MarianBuild(
+        "ubuntu",
+        name,
+        os,
+        env,
+        setup,
+        build,
+        build_epilog(context='matrix'),
+        BRT(jobid, tags))
+    matrix_job = matrix_build.constructMatrixJob(matrix, with_cache=True)
+    return {matrix_job.id(): matrix_job}
 
-    
   return build_matrix_jobs(matrix)
 
 
@@ -223,6 +245,12 @@ def mac():
       ImportedSnippet(
           "Install Dependencies",
           "examples/bergamot-translator/native-mac/00-install-deps.sh"),
+      JobShellStep(
+          name="Setup path with gnu",
+          run='\n'.join([
+              'echo "/usr/local/opt/coreutils/libexec/gnubin" >> $GITHUB_PATH',
+              'echo "/usr/local/opt/findutils/libexec/gnubin" >> $GITHUB_PATH'
+          ])),
       JobShellStep(
           name="Setup BLAS",
           run='\n'.join([
@@ -239,19 +267,19 @@ def mac():
   ]
 
   def build_epilog(context):
-      build_epilog = [
-          ImportedSnippet(
-              "Print Versions",
-              "examples/bergamot-translator/native-ubuntu/21-print-versions.sh",
-              working_directory='build'),
-          ImportedSnippet(
-              "Run unit tests",
-              "examples/bergamot-translator/native-ubuntu/30-unit-tests.sh",
-              working_directory='build',
-              condition=GitHubExpr("{} == 'true'".format(
-                  GitHubMapping('unittests', context=context)))),
-      ]
-      return build_epilog
+    build_epilog = [
+        ImportedSnippet(
+            "Print Versions",
+            "examples/bergamot-translator/native-ubuntu/21-print-versions.sh",
+            working_directory='build'),
+        ImportedSnippet(
+            "Run unit tests",
+            "examples/bergamot-translator/native-ubuntu/30-unit-tests.sh",
+            working_directory='build',
+            condition=GitHubExpr("{} == 'true'".format(
+                GitHubMapping('unittests', context=context)))),
+    ]
+    return build_epilog
 
   configs = {
       "full": {
@@ -259,20 +287,20 @@ def mac():
           '-DCOMPILE_TESTS=on -DUSE_APPLE_ACCELERATE=off -DUSE_FBGEMM=off -DUSE_STATIC_LIBS=off',
           "brt_tags":
           QuotedExpr("'#mac'"),
-          'unittests': 'true',
+          'unittests':
+          'true',
       },
       "minimal": {
           'cmake':
           '-DCOMPILE_TESTS=off -DUSE_APPLE_ACCELERATE=off -DUSE_FBGEMM=off -DUSE_STATIC_LIBS=on -DUSE_WASM_COMPATIBLE_SOURCE=on',
           'brt_tags':
           QuotedExpr("'#wasm'"),
-          'unittests': 'false',
+          'unittests':
+          'false',
       }
   }
 
-  matrix = {
-    "include": []
-  }
+  matrix = {"include": []}
 
   def platform_mac(version, env_name):
     version_identifier = version.replace('.', '')
@@ -284,40 +312,48 @@ def mac():
     return platform
 
   for version in ['10.15']:
-      for env_name, env in configs.items():
-        platform = platform_mac(version, env_name)
-        matrix["include"].append({
-            "name": platform["name"],
-            "os": platform["os"],
-            "identifier": platform["id"],
-            "cmake": env["cmake"],
-            "brt_tags": env["brt_tags"],
-            "unittests": env["unittests"]
-          })
+    for env_name, env in configs.items():
+      platform = platform_mac(version, env_name)
+      matrix["include"].append({
+          "name": platform["name"],
+          "os": platform["os"],
+          "identifier": platform["id"],
+          "cmake": env["cmake"],
+          "brt_tags": env["brt_tags"],
+          "unittests": env["unittests"]
+      })
 
   def build_matrix_jobs(matrix):
-      name = GitHubExpr(GitHubMapping('name', context='matrix'))
-      os = GitHubExpr(GitHubMapping('os', context='matrix'))
-      env = None
-      jobid = GitHubExpr(GitHubMapping('identifier', context='matrix'))
-      tags = GitHubExpr(GitHubMapping('brt_tags', context='matrix'))
-      matrix_build = MarianBuild("mac", name, os, env, setup, build, build_epilog(context='matrix'), BRT(jobid, tags))
-      matrix_job = matrix_build.constructMatrixJob(matrix, with_cache=True)
-      return {matrix_job.id(): matrix_job}
+    name = GitHubExpr(GitHubMapping('name', context='matrix'))
+    os = GitHubExpr(GitHubMapping('os', context='matrix'))
+    env = None
+    jobid = GitHubExpr(GitHubMapping('identifier', context='matrix'))
+    tags = GitHubExpr(GitHubMapping('brt_tags', context='matrix'))
+    matrix_build = MarianBuild(
+        "mac",
+        name,
+        os,
+        env,
+        setup,
+        build,
+        build_epilog(context='matrix'),
+        BRT(jobid, tags))
+    matrix_job = matrix_build.constructMatrixJob(matrix, with_cache=True)
+    return {matrix_job.id(): matrix_job}
 
   # def __init__(self, id, name, env, setup, build_deps, build, build_epilog, brt):
   def build_env_job():
-      jobs = {}
-      for env_name, env in configs.items():
-        tags = GitHubExpr(GitHubMapping('brt_tags', context='env'))
-        jobid = GitHubExpr(GitHubMapping('job', context='github'))
-        variations = MarianBuild(platform["id"], platform["name"], platform["os"],
-                                 env, setup, build, build_epilog, BRT(jobid, tags))
-        jobs.update(variations.generate())
-      return jobs
+    jobs = {}
+    for env_name, env in configs.items():
+      tags = GitHubExpr(GitHubMapping('brt_tags', context='env'))
+      jobid = GitHubExpr(GitHubMapping('job', context='github'))
+      variations = MarianBuild(platform["id"], platform["name"],
+                               platform["os"], env, setup, build, build_epilog,
+                               BRT(jobid, tags))
+      jobs.update(variations.generate())
+    return jobs
 
   return build_matrix_jobs(matrix)
-
 
 
 if __name__ == '__main__':
@@ -331,15 +367,24 @@ if __name__ == '__main__':
   #       }
   #     })
   env = ({
-      "ccache_base_dir": GitHubExpr(GitHubMapping('workspace', context='github')),
+      "ccache_basedir":
+      GitHubExpr(GitHubMapping('workspace', context='github')),
       "ccache_dir":
-      QuotedExpr( os.path.join( GitHubExpr(GitHubMapping('workspace', context='github')), '.ccache')),
-      "ccache_compilercheck": 'content',
-      "cache_compress": "true",
-      "ccache_maxsize": "50M",
+      QuotedExpr(
+          os.path.join(
+              GitHubExpr(GitHubMapping('workspace', context='github')),
+              '.ccache')),
+      "ccache_compilercheck":
+      'content',
+      "ccache_compress":
+      "true",
+      "ccache_compresslevel": 9,
+      "ccache_maxsize":
+      "200M",
       # QuotedExpr(
       #     'bash ${GITHUB_WORKSPACE}/scripts/ci/compiler-hash.sh %compiler%'),
-      "ccache_cmake": '-DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_C_COMPILER_LAUNCHER=ccache'
+      "ccache_cmake":
+      '-DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_C_COMPILER_LAUNCHER=ccache'
   })
 
   jobs = {}

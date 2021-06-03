@@ -6,8 +6,9 @@ class CcacheEnv(JobShellStep):
   def __init__(self, config):
     env = {
         'COMPILER_CHECK': config["compilercheck"],
-        'BASE_DIR': config["base_dir"],
+        'BASEDIR': config["basedir"],
         'COMPRESS': config["compress"],
+        'COMPRESSLEVEL': config["compresslevel"],
         'DIR': config["dir"],
         'MAXSIZE': config["maxsize"]
     }

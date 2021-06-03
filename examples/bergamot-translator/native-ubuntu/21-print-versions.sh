@@ -1,1 +1,1 @@
-./app/bergamot-translator-app --version
+./app/bergamot --version

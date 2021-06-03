@@ -3,7 +3,11 @@ from . import YAMLRenderable, Snippet, GitHubExpr, QuotedExpr, GitHubMapping
 
 class On(YAMLRenderable):
 
-  def __init__(self, push=None, pull_request=None, schedule=None, workflow_dispatch=None):
+  def __init__(self,
+               push=None,
+               pull_request=None,
+               schedule=None,
+               workflow_dispatch=None):
     self.fields = {
         "push": push,
         "pull_request": pull_request,
@@ -80,7 +84,6 @@ class MatrixJob(YAMLRenderable):
         "needs": None,
         "steps": steps,
         "outputs": outputs,
-
     }
 
   def id(self):
@@ -173,8 +176,10 @@ class BRT(list):
   def __init__(self, jobid, tags,
                working_directory='bergamot-translator-tests'):
     brt_id = 'brt_run'
-    brt_failure = GitHubExpr("always() && {} == 'failure'".format("steps.{}.outcome".format(brt_id)))
-    brt_unskipped = GitHubExpr("always() && {} != 'skipped'".format("steps.{}.outcome".format(brt_id)))
+    brt_failure = GitHubExpr("always() && {} == 'failure'".format(
+        "steps.{}.outcome".format(brt_id)))
+    brt_unskipped = GitHubExpr("always() && {} != 'skipped'".format(
+        "steps.{}.outcome".format(brt_id)))
     super().__init__([
         JobShellStep(
             name="Install regression-test framework (BRT)",
@@ -188,7 +193,8 @@ class BRT(list):
         JobShellStep(
             name="Print logs of unsuccessful BRTs",
             working_directory=working_directory,
-            run="grep \"tests.*.sh\" previous.log  | sed 's/^\s*-\s*//' | xargs -I% tail -n100 -v %.log",
+            run=
+            "grep \"tests.*.sh\" previous.log  | sed 's/^\s*-\s*//' | xargs -I% bash -c 'echo %; tail -n20 %.log",
             condition=brt_failure),
         UploadArtifacts(jobid, condition=brt_unskipped)
     ])
@@ -240,6 +246,7 @@ class Evaluate(YAMLRenderable):
         "run": "echo $EXPR_VALUE"
     }
 
+
 def RunIfFailed(job):
   return GitHubExpr("always() && {} == 'failure'".format(
       "needs.{jobid}.result".format(jobid=job.id())))
@@ -247,4 +254,3 @@ def RunIfFailed(job):
 
 def Always(job):
   return GitHubExpr("always()")
-
